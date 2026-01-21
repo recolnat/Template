@@ -1,0 +1,141 @@
+include:
+  - template: SAST.gitlab-ci.yml
+
+
+variables:
+  MAVEN_CLI_OPTS: "-s .m2/settings.xml --batch-mode"
+  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
+
+  # Instruct Testcontainers to use the daemon of DinD.
+  DOCKER_HOST: "tcp://docker:2375"
+  # Instruct Docker not to start over TLS.
+  DOCKER_TLS_CERTDIR: ""
+  # Improve performance with overlayfs.
+  DOCKER_DRIVER: overlay2
+  RECOLNAT_VERSION: 1.0.0
+  APP_VERSION: ""
+
+stages:
+  - sast
+  - build
+  - test
+  - docker-publish
+  
+
+# DinD service is required for Testcontainers
+services:
+  - name: docker:dind
+    # explicitly disable tls to avoid docker startup interruption
+    command: ["--tls=false"]
+
+default:
+  image: maven:3-openjdk-17-slim
+
+sast:
+  stage: sast
+  image:
+    name: registry.gitlab.com/gitlab-org/security-products/sast:13-4-stable
+    entrypoint: [""]
+  variables:
+    SECURE_ANALYZERS_PREFIX: "registry.gitlab.com/gitlab-org/security-products/analyzers"
+  script:
+    - /analyze
+  artifacts:
+    reports:
+      sast: gl-sast-report.json
+
+build-dev:
+  stage: build
+  script:
+    - export APP_VERSION="dev"
+    - echo "Compiling the code..."
+  #  - mvn versions:set -DnewVersion=$APP_VERSION
+    - mvn $MAVEN_CLI_OPTS -Drevision=$APP_VERSION clean install -f ./pom.xml
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && ($CI_COMMIT_BRANCH == "develop")
+      when: on_success
+
+build-dev-without-tests:
+  stage: build
+  script:
+    - export APP_VERSION="dev"
+    - echo "Compiling the code..."
+    - mvn $MAVEN_CLI_OPTS -Drevision=$APP_VERSION clean install -DskipTests -f ./pom.xml
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+
+
+build-staging:
+  stage: build
+  script:
+    - export APP_VERSION="rc"
+    - echo "Compiling the code..."
+    - mvn $MAVEN_CLI_OPTS -Drevision=$APP_VERSION clean install -f ./pom.xml
+  only:
+   - staging
+
+
+build-prod:
+  stage: build
+  script:
+    - export APP_VERSION="prod"
+    - echo "Compiling the code..."
+    - mvn $MAVEN_CLI_OPTS -Drevision=$APP_VERSION clean install -f ./pom.xml
+  only:
+   - main
+  
+sonarqube-track:
+  stage: test
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
+    GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .sonar/cache
+  script:
+    -  mvn clean verify sonar:sonar   -Dsonar.projectKey=$PROJECT_CI   -Dsonar.projectName=$PROJECT_CI   -Dsonar.host.url=https://dinsi-sonarqube.mnhn.fr   -Dsonar.token=$SONAR_TOKEN
+  allow_failure: true
+  only:
+    - merge_requests
+    - main
+    - develop
+
+docker-publish-dev:
+  stage: docker-publish
+  script:
+    - export APP_VERSION="dev"
+    - mvn versions:set -DnewVersion=$APP_VERSION
+    - mvn $MAVEN_CLI_OPTS -Drevision=$APP_VERSION clean deploy -DskipTests -f ./pom.xml
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && ($CI_COMMIT_BRANCH == "develop")
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual  
+
+
+docker-publish-staging:
+  stage: docker-publish
+  script:
+    - export APP_VERSION="rc"
+    - mvn $MAVEN_CLI_OPTS -Drevision=$APP_VERSION clean deploy -DskipTests -f ./pom.xml
+  only:
+    - staging
+
+docker-publish-prod:
+  stage: docker-publish
+  script:
+    - export APP_VERSION="prod"
+    - mvn $MAVEN_CLI_OPTS -Drevision=$APP_VERSION clean deploy -DskipTests -f ./pom.xml
+  only:
+    - main
+
+docker-publish-test:
+  stage: docker-publish
+  script:
+    - export APP_VERSION="test"
+    - mvn $MAVEN_CLI_OPTS -Drevision=$APP_VERSION clean deploy -DskipTests -f ./pom.xml
+  only:
+    - refonte
+
