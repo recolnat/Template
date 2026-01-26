@@ -15,6 +15,9 @@ on:
       project_ci:
         required: true
         type: string
+      branch:
+        required: true
+        type: string
     secrets:
       HARBOR_REGISTRY_PASSWORD:
         required: true
