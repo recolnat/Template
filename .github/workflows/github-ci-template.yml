@@ -15,7 +15,10 @@ on:
       project_ci:
         required: true
         type: string
-      branch:
+      short_sha:
+        required: true
+        type: string
+      app_version:
         required: true
         type: string
     secrets:
@@ -54,15 +57,7 @@ jobs:
       - name: Set app version
         id: set-version
         run: |
-          if [[ "${{ github.ref_name }}" == "develop" ]]; then
-            echo "APP_VERSION=dev" >> $GITHUB_ENV
-          elif [[ "${{ github.ref_name }}" == "staging" ]]; then
-            echo "APP_VERSION=rc" >> $GITHUB_ENV
-          elif [[ "${{ github.ref_name }}" == "main" ]]; then
-            echo "APP_VERSION=prod" >> $GITHUB_ENV
-          else
-            echo "APP_VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
-          fi
+          echo "APP_VERSION=${{ inputs.app_version }}-$(echo ${{ inputs.short_sha }} | cut -c1-8)" >> $GITHUB_ENV
 
       - name: Map Nexus domain in /etc/hosts
         run: |
@@ -111,10 +106,10 @@ jobs:
       #       -Dsonar.java.binaries=target
 
       - name: Build Docker image
-        run: docker build -t ${{ env.RECOLNAT_REGISTRY }}/dinsi-oci-images-repo/recolnat/${{ inputs.project_ci }}:${{ github.sha }} -f Dockerfile .
+        run: docker build -t ${{ env.RECOLNAT_REGISTRY }}/dinsi-oci-images-repo/recolnat/${{ inputs.project_ci }}:${{ env.APP_VERSION }} -f Dockerfile .
 
       - name: Log in to Docker registry
         run: docker login dfgxr43v.c1.gra9.container-registry.ovh.net -u 'robot$recolnat-ci' -p ${{ secrets.HARBOR_REGISTRY_PASSWORD }}
 
       - name: Push Docker image
-        run: docker push ${{ env.RECOLNAT_REGISTRY }}/dinsi-oci-images-repo/recolnat/${{ inputs.project_ci }}:${{ github.sha }}
+        run: docker push ${{ env.RECOLNAT_REGISTRY }}/dinsi-oci-images-repo/recolnat/${{ inputs.project_ci }}:${{ env.APP_VERSION }} }}
