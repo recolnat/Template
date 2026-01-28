@@ -112,4 +112,4 @@ jobs:
         run: docker login dfgxr43v.c1.gra9.container-registry.ovh.net -u 'robot$recolnat-ci' -p ${{ secrets.HARBOR_REGISTRY_PASSWORD }}
 
       - name: Push Docker image
-        run: docker push ${{ env.RECOLNAT_REGISTRY }}/dinsi-oci-images-repo/recolnat/${{ inputs.project_ci }}:${{ env.APP_VERSION }} }}
+        run: docker push ${{ env.RECOLNAT_REGISTRY }}/dinsi-oci-images-repo/recolnat/${{ inputs.project_ci }}:${{ env.APP_VERSION }}
