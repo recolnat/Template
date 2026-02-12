@@ -61,14 +61,21 @@ jobs:
 
       - name: Map Nexus domain in /etc/hosts
         run: |
-          echo "51.210.167.37 dinsi-nexus.mnhn.cloud" | sudo tee -a /etc/hosts
+          echo "51.210.167.37 nexus.mnhn.cloud" | sudo tee -a /etc/hosts
 
-      - name: Generate and add Nexus certificate to trust store
+      - name: Extract all Nexus certificates (single file)
         run: |
-          echo | openssl s_client -showcerts -servername dinsi-nexus.mnhn.cloud -connect 51.210.167.37:443 2>/dev/null | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > nexus-cert.pem
-          sudo cp nexus-cert.pem /usr/local/share/ca-certificates/nexus-cert.crt
-          sudo update-ca-certificates
-          sudo keytool -import -trustcacerts -keystore $JAVA_HOME/lib/security/cacerts -storepass changeit -noprompt -alias nexus-cert -file nexus-cert.pem
+          echo | openssl s_client -showcerts -servername nexus.mnhn.cloud -connect 51.210.167.37:443 2>/dev/null \
+            | awk '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/{print $0}' > nexus-certs.pem
+
+      - name: Import all Nexus certificates in Java truststore
+        run: |
+          csplit -f cert- -b '%02d.pem' nexus-certs.pem '/-----BEGIN CERTIFICATE-----/' '{*}'
+          for cert in cert-*.pem; do
+            if grep -q 'BEGIN CERTIFICATE' $cert; then
+              keytool -importcert -noprompt -trustcacerts -alias nexus-mnhn-$cert -file $cert -keystore $JAVA_HOME/lib/security/cacerts -storepass changeit || true
+            fi
+          done
 
       - name: Build JAR
         run: mvn $MAVEN_CLI_OPTS -Drevision=${{ env.APP_VERSION }} clean package -DskipTests -f ./pom.xml
