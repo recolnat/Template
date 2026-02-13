@@ -25,9 +25,9 @@ on:
       HARBOR_REGISTRY_PASSWORD:
         required: true
       CF_ACCESS_CLIENT_ID:
-        required: true
+        required: false
       CF_ACCESS_CLIENT_SECRET:
-        required: true
+        required: false
       SONAR_TOKEN:
         required: false
       SONAR_URL:
