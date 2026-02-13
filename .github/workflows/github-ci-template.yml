@@ -77,7 +77,7 @@ jobs:
         env:
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-        run: mvn $MAVEN_CLI_OPTS -Drevision=${{ env.APP_VERSION }} clean package -DskipTests -f ./pom.xml
+        run: mvn $MAVEN_CLI_OPTS -Drevision=${{ env.APP_VERSION }} clean package -DskipTests=true -Dmaven.test.skip=true -f ./pom.xml
 
       # - name: SonarQube Analysis
       #   env:
