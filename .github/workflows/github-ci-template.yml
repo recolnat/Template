@@ -44,6 +44,10 @@ env:
 
 jobs:
   build-and-push:
+    if: >
+      inputs.app_version == 'develop' ||
+      inputs.app_version == 'staging' ||
+      inputs.app_version == 'main'
     runs-on: ubuntu-latest
     env:
       RECOLNAT_REGISTRY: dfgxr43v.c1.gra9.container-registry.ovh.net
